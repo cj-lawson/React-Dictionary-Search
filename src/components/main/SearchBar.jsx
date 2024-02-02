@@ -3,23 +3,43 @@ import { useQuery } from "@tanstack/react-query";
 import useSearchWordStore from "../../store/searchWord";
 
 const SearchBar = () => {
-  const { query, setQuery, setResult } = useSearchWordStore((state) => ({
-    query: state.query,
-    setQuery: state.setQuery,
-    setResult: state.setResult,
-  }));
+  const { query, setQuery, setResult, setError } = useSearchWordStore(
+    (state) => ({
+      query: state.query,
+      setQuery: state.setQuery,
+      setResult: state.setResult,
+      error: state.error,
+      setError: state.setError,
+    })
+  );
 
   const [queryIsValid, setQueryIsValid] = useState(true);
 
   useQuery({
     queryKey: ["search", query],
-    queryFn: () =>
-      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${query}`)
-        .then((response) => response.json())
-        .then((data) => {
-          setResult(data[0]);
-          return data;
-        }),
+    queryFn: async () => {
+      try {
+        const response = await fetch(
+          `https://api.dictionaryapi.dev/api/v2/entries/en/${query}`
+        );
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError(true);
+            throw new Error("Oops, something went wrong!");
+          }
+          // Handle other non-404 errors here if needed
+          throw new Error("Unexpected response from server");
+        }
+        const data = await response.json();
+        setError(false);
+        setResult(data[0]);
+        return data;
+      } catch (error) {
+        console.error(error); // Log the error to the console
+        throw error; // Re-throw the error for React Query to handle
+      }
+    },
     enabled: Boolean(query),
     staleTime: 1200,
   });
